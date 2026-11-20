@@ -79,6 +79,7 @@ export default function ProductReportPage() {
   const [report, setReport] = useState<ProductReport | null>(null);
   const [options, setOptions] = useState<{ value: number; label: string }[]>([]);
   const [companyQuery, setCompanyQuery] = useState('');
+  const [metric, setMetric] = useState<'revenue' | 'qty' | 'companies' | 'deals'>('revenue');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -350,11 +351,24 @@ export default function ProductReportPage() {
         size="small"
         title={`Динамика по ${group === 'month' ? 'месяцам' : group === 'quarter' ? 'кварталам' : 'годам'}`}
         extra={
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Flex gap={12} wrap align="center">
+            <Segmented
+              size="small"
+              value={metric}
+              onChange={(value) => setMetric(value as typeof metric)}
+              options={[
+                { value: 'revenue', label: 'Выручка' },
+                { value: 'qty', label: 'Количество' },
+                { value: 'companies', label: 'Компании' },
+                { value: 'deals', label: 'Сделки' },
+              ]}
+            />
+            <Text type="secondary" style={{ fontSize: 12 }}>
             {totals.first_at ? `первая продажа ${fmtDate(totals.first_at)}` : 'продаж нет'}
             {totals.last_at ? ` · последняя ${fmtDate(totals.last_at)}` : ''}
-            {totals.discount ? ` · скидки ${money(totals.discount, currency)}` : ''}
-          </Text>
+              {totals.discount ? ` · скидки ${money(totals.discount, currency)}` : ''}
+            </Text>
+          </Flex>
         }
       >
         {timeline.length ? (
@@ -368,15 +382,29 @@ export default function ProductReportPage() {
               </defs>
               <CartesianGrid stroke={grid} vertical={false} />
               <XAxis dataKey="period" stroke={grid} tick={{ fontSize: 12, fill: axis.fill }} tickFormatter={(value) => fmtDate(String(value))} />
-              <YAxis stroke={grid} tick={{ fontSize: 12, fill: axis.fill }} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+              <YAxis
+                stroke={grid}
+                tick={{ fontSize: 12, fill: axis.fill }}
+                tickFormatter={(value) =>
+                  metric === 'revenue' ? `${Math.round(Number(value) / 1000)}k` : String(Math.round(Number(value)))
+                }
+              />
               <ChartTooltip
                 contentStyle={tooltip}
-                formatter={(value: number, name: string) =>
-                  name === 'revenue' ? [money(value, currency), 'Выручка'] : [Number(value).toLocaleString('ru-RU'), name === 'qty' ? 'Кол-во' : 'Сделок']
-                }
+                formatter={(value: number, name: string) => {
+                  if (name === 'revenue') return [money(value, currency), 'Выручка'];
+                  const labels: Record<string, string> = { qty: 'Количество', deals: 'Сделок', companies: 'Компаний' };
+                  return [Number(value).toLocaleString('ru-RU'), labels[name] ?? name];
+                }}
                 labelFormatter={(value) => fmtDate(String(value))}
               />
-              <Area type="monotone" dataKey="revenue" stroke={CHART_PALETTE[0]} strokeWidth={2} fill="url(#productRevenue)" />
+              <Area
+                type="monotone"
+                dataKey={metric}
+                stroke={CHART_PALETTE[0]}
+                strokeWidth={2}
+                fill="url(#productRevenue)"
+              />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
