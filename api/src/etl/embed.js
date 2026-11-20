@@ -125,7 +125,8 @@ const ENTITIES = {
   lead: {
     table: 'leads',
     select: `SELECT l.id, l.title, l.status_id, l.source_id, l.opportunity, l.currency_id,
-                    l.phones, l.emails, c.title AS company_title, ct.title AS contact_title
+                    l.raw->'PHONE' AS phones, l.raw->'EMAIL' AS emails,
+                    c.title AS company_title, ct.title AS contact_title
                FROM leads l
                LEFT JOIN companies c ON c.id = l.company_id
                LEFT JOIN contacts ct ON ct.id = l.contact_id
