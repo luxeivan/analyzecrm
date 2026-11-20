@@ -299,6 +299,7 @@ productsRouter.get('/products/:id/report', async (req, res, next) => {
     const group = groupSql(req);
 
     const params = [];
+    const companiesParams = [];
     const dealsParams = [];
     const { sql: base, period } = reportBase(params, req, { productId: id });
 
@@ -336,13 +337,16 @@ productsRouter.get('/products/:id/report', async (req, res, next) => {
                 count(DISTINCT r.deal_id) FILTER (WHERE ${WON})::int AS won_deals,
                 min(d.date_create) AS first_at,
                 max(d.date_create) AS last_at,
-                count(DISTINCT ct.id)::int AS contacts
-           ${base}
+                max((SELECT count(*) FROM contacts c2 WHERE c2.company_id = d.company_id))::int AS contacts
+           ${reportBase(companiesParams, req, {
+             productId: id,
+             extraJoin: 'LEFT JOIN companies co ON co.id = d.company_id',
+           }).sql}
              AND d.company_id IS NOT NULL
           GROUP BY d.company_id
           ORDER BY revenue DESC NULLS LAST
-          LIMIT $${params.length + 1}`,
-        [...params, limit],
+          LIMIT $${companiesParams.length + 1}`,
+        [...companiesParams, limit],
       ),
       query(
         `SELECT r.deal_id, d.title AS deal_title, d.stage_id, d.company_id, co.title AS company_title,
