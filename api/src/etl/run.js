@@ -257,6 +257,10 @@ export async function runEtl({
   for (const entity of entityList) {
     try {
       await checkControl(control);
+      if (!full && entity.skipIncremental) {
+        onEvent({ type: 'entity-done', entity: entity.key, fetched: 0, seconds: 0, lastId: 0, total: null, skipped: true });
+        continue;
+      }
       if (entity.custom) {
         await loadDealProductRows({
           full,
@@ -289,6 +293,7 @@ export async function runEtl({
     for (const entity of entityList) {
       try {
         await checkControl(control);
+        if (entity.skipIncremental) continue;
         if (entity.custom) {
           await refreshProductRows({ control, onEvent, overlapMinutes: undefined });
           continue;

@@ -135,6 +135,8 @@ export const ENTITIES = {
     // sections: keyset (>ID) у этого метода не работает — портал игнорирует фильтр,
     // поэтому разделы (их ~1000) тянем offset-пагинацией, как окно дельты
     pagination: 'offset',
+    // справочник меняется редко: в инкрементальных прогонах не трогаем (только полная выгрузка)
+    skipIncremental: true,
     columns: ['id', 'name', 'parent_id', 'sort', 'raw', 'synced_at'],
   },
   // Состав сделок: собственной таблицы-страницы нет, загрузчик в etl/productrows.js
