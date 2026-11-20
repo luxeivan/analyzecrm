@@ -100,7 +100,7 @@ export default function ProductsPage() {
   const [section, setSection] = useState<number | undefined>();
   const [soldOnly, setSoldOnly] = useState(true);
   const [stage, setStage] = useState<'won' | 'all'>('won');
-  const [preset, setPreset] = useState('90d');
+  const [preset, setPreset] = useState('all');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'revenue', dir: 'desc' });

@@ -73,7 +73,7 @@ export default function ProductReportPage() {
   const navigate = useNavigate();
   const { grid, axis, tooltip } = useChartTheme();
 
-  const [preset, setPreset] = useState('90d');
+  const [preset, setPreset] = useState('all');
   const [group, setGroup] = useState('month');
   const [stage, setStage] = useState<'won' | 'all'>('won');
   const [report, setReport] = useState<ProductReport | null>(null);
