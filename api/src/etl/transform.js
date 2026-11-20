@@ -132,6 +132,9 @@ export const ENTITIES = {
     table: 'product_sections',
     method: 'crm.productsection.list',
     fieldsMethod: 'crm.productsection.fields',
+    // sections: keyset (>ID) у этого метода не работает — портал игнорирует фильтр,
+    // поэтому разделы (их ~1000) тянем offset-пагинацией, как окно дельты
+    pagination: 'offset',
     columns: ['id', 'name', 'parent_id', 'sort', 'raw', 'synced_at'],
   },
   // Состав сделок: собственной таблицы-страницы нет, загрузчик в etl/productrows.js

@@ -82,6 +82,39 @@ async function loadEntity(entity, meta, { full, control, onEvent, limit }) {
   await markSync(entity.key, 'running');
   const startedAt = Date.now();
 
+  // Некоторые справочники (разделы каталога) не поддерживают keyset-фильтр «>ID»:
+  // для них идём обычной offset-пагинацией и переписываем все записи.
+  if (entity.pagination === 'offset') {
+    const { fetched, total, lastId } = await fetchWindow(entity.method, {
+      select,
+      order: { ID: 'ASC' },
+      maxItems: limit || null,
+      beforeRequest: control?.check ? () => control.check() : undefined,
+      onPage: async (items, info) => {
+        const rows = items.map((raw) => transformRow(entity.key, raw));
+        await insertPage(entity, rows, {
+          total: info.total,
+          lastId: info.lastId,
+          fetched: items.length,
+        });
+        onEvent({
+          type: 'page',
+          entity: entity.key,
+          page: info.page,
+          lastId: info.lastId,
+          total: info.total,
+          fetched: info.fetched,
+        });
+      },
+    });
+
+    const seconds = Number(((Date.now() - startedAt) / 1000).toFixed(1));
+    onEvent({ type: 'entity-done', entity: entity.key, fetched, seconds, lastId, total });
+    await markSync(entity.key, 'done');
+    await resetCursor(entity.key);
+    return;
+  }
+
   const { fetched, total, lastId } = await fetchAll(entity.method, {
     select,
     resumeFrom,
