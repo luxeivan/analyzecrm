@@ -57,6 +57,23 @@ services:
     networks:
       - bitrix_net
 
+  # Любая ETL-команда в отдельном контейнере (каталог, состав сделок, дубли):
+  #   docker compose -f docker-compose.prod.yml --profile tools run -d --rm --name bitrix_catalog   #     etl node src/etl/run.js --only=product_section,product,deal_products
+  etl:
+    image: bitrix-analyze-api
+    profiles: ["tools"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-bitrix}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bitrix}
+      NODE_ENV: production
+      TZ: ${TZ:-Europe/Moscow}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - bitrix_net
+
   # Векторизация (эмбеддинги) — отдельный контейнер, чтобы пересборка api её не убивала:
   #   docker compose -f docker-compose.prod.yml --profile tools run -d --rm --name bitrix_embed embed
   embed:
