@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.log
+pgdata/
+.DS_Store
+
+# логи фоновых задач (reconcile/embed)
+api/*.log

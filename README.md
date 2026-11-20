@@ -1,0 +1,157 @@
+# Bitrix24 CRM Analyzer
+
+Выгрузка и анализ данных облачного Битрикс24: ETL в PostgreSQL (pgvector), API для поиска/связей/агрегатов и
+веб-интерфейс с дашбордом, таблицей компаний, карточкой клиента и графом связей.
+
+Интерфейс на Ant Design 5 со светлой и тёмной темой (переключатель в шапке): дашборд с управлением
+выгрузкой и выделенными карточками сущностей, таблицы компаний, контактов, сделок и лидов,
+карточки компании/контакта/сделки/лида с расшифровкой кастомных полей и итогами по сделкам
+(сумма всех сделок, в работе, успешные), страница «Аналитика» (покрытие данных, воронка, выручка
+по годам, источники и качество данных с рекомендациями), граф связей.
+
+Подробности архитектуры и правил разработки — в [AGENTS.md](./AGENTS.md).
+Предложение по pgvector и LLM — в [pgvector-i-llm-analiz-crm.pdf](./pgvector-i-llm-analiz-crm.pdf)
+(генератор: `scripts/make_analytics_pdf.py`).
+
+## Запуск
+
+```bash
+cp .env.example .env            # указать BITRIX_WEBHOOK_URL (права crm)
+docker compose up -d db adminer api web
+docker compose --profile etl run --rm etl
+```
+
+| Сервис | URL |
+| --- | --- |
+| Frontend | http://localhost:5173 |
+| API | http://localhost:4000/api/health |
+| Adminer | http://localhost:8080 (`db`, `bitrix`, `bitrix`) |
+| PostgreSQL | `localhost:55432`, БД `bitrix` |
+
+Выгрузку можно запускать и из интерфейса: на дашборде карточка **«Выгрузка из Битрикс24»**
+с кнопками ▶ Старт / ⏸ Пауза / ⏵ Продолжить / ⏹ Остановить, прогрессом и журналом.
+
+Повторный запуск ETL продолжает с последнего `ID` (инкрементально). Полная перевыгрузка:
+
+```bash
+docker compose --profile etl run --rm etl npm run etl:full
+```
+
+## Деплой и единый экземпляр данных
+
+Продовый стек (nginx + API + Postgres) и перенос данных с локальной машины описаны в
+[`docs/DEPLOY.md`](docs/DEPLOY.md): дамп Postgres переносит и данные, и эмбеддинги с HNSW-индексами;
+локально поднимается только Vite, а `/api` проксируется на сервер (`VITE_API_PROXY`).
+
+```bash
+# на сервере
+cp .env.example .env && nano .env        # пароли, AUTH_*, SYNC_SCHEDULER=1
+docker compose -f docker-compose.prod.yml up -d db
+# восстановить дамп (см. docs/DEPLOY.md), затем:
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+## Аналитика
+
+Период выбирается на странице: текущий месяц (по умолчанию), прошлый, 3 месяца, год или всё время.
+Фильтр применяется к сделкам (по `BEGINDATE`) и лидам (по дате создания); покрытие и качество данных — глобальные.
+
+Управление выгрузкой, прогресс векторизации и системная информация вынесены на страницу **«Админка»** (`/admin`).
+
+После векторизации доступны семантические инструменты: страница **«Поиск по смыслу»** (`/search`) с поиском
+по обычному тексту и отчётом «Кандидаты в дубли», а на карточках компании/контакта/сделки/лида — блок
+«Похожие» (ближайшие соседи по вектору), страница **«Потенциальные клиенты»** (`/lookalike`, look-alike по центроиду
+лучших клиентов) и **«Ассистент»** (`/assistant`, RAG: вопрос → pgvector → ответ LLM со ссылками на записи).
+
+Страница **«Аналитика»** (`/analytics`) считает метрики на сервере (`GET /api/analytics/overview`):
+покрытие данных (загружено / всего в портале), выручку и win rate по `BEGINDATE`, конверсию лидов,
+источники, географию, топ клиентов, качество данных (пропуски, дубли, битые связи) и рекомендации.
+
+Блок **«Выводы LLM»** вызывает `POST /api/ai/insights`. Без ключа он показывает инструкцию, остальная
+аналитика работает. Настройка в `.env` (OpenAI-совместимый API — OpenAI, OpenRouter, Ollama, vLLM):
+
+```bash
+# вариант 1 — Polza.ai (OpenAI-совместимый шлюз)
+POLZA_TOKEN=pza_...
+POLZA_MODEL=deepseek/deepseek-v4.1-flash-1017
+
+# вариант 2 — любой OpenAI-совместимый API
+LLM_API_KEY=sk-...
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-4o-mini
+```
+
+Один прогон аналитики на `deepseek/deepseek-v4.1-flash-1017` — около 3 тыс. токенов и 0,12 ₽
+(замер: вход 1 292 / выход 1 712, из них 1 162 reasoning). Блок в UI показывает модель, токены и стоимость.
+
+После изменения `.env` перезапустить: `docker compose up -d --force-recreate api`.
+
+## Регулярная синхронизация
+
+CRM меняется: добавляются записи, редактируются старые, что-то удаляется. Режимы:
+
+| Что | Как |
+|---|---|
+| Новые записи | инкремент по `>ID` (курсор `last_id`) |
+| Правки существующих | дельта по `DATE_MODIFY` (курсор `last_modified`, перекрытие 5 мин) |
+| Удаления / слияния | `reconcile.js`: все ID батчами, лишнее удаляется в `deleted_records` |
+| Эмбеддинги | `embed.js` берёт только новые и изменённые (`date_modify > embedded_at`) |
+
+Автоматически (планировщик внутри API):
+
+```bash
+# .env
+SYNC_SCHEDULER=1
+SYNC_INTERVAL_MIN=15      # цикл: новые + правки + эмбеддинги
+RECONCILE_DAYS=7          # раз в неделю — сверка удалённых
+```
+```bash
+docker compose up -d --force-recreate api
+```
+
+Вручную: кнопка **«Старт»** на дашборде теперь выполняет и инкремент, и дельту правок;
+либо CLI:
+
+```bash
+docker compose exec -T api npm run etl:delta     # новые + правки
+docker compose exec -T api npm run reconcile -- --dry   # проверка удалённых без удаления
+docker compose exec -T api npm run reconcile            # удалить отсутствующие в CRM
+```
+
+Альтернатива планировщику — cron на хосте: `*/15 * * * * docker compose --profile etl run --rm -T etl npm run etl:delta`.
+
+## Векторизация (pgvector)
+
+Скрипт `api/src/etl/embed.js` считает эмбеддинги через Polza.ai
+(`openai/text-embedding-3-small`, 1536 измерений) и складывает их в колонки `embedding`.
+ETL-выгрузка колонку не трогает, поэтому векторы сохраняются между синками.
+
+```bash
+# после полной выгрузки — все сущности + HNSW-индексы
+docker compose exec -T api node src/etl/embed.js --index
+
+# только компании и контакты, первые 1000 записей (тест)
+docker compose exec -T api node src/etl/embed.js --only=company,contact --limit=1000
+
+# пересчитать всё заново (например, после смены модели)
+docker compose exec -T api node src/etl/embed.js --force --index
+```
+
+ENV: `POLZA_TOKEN`, `EMBEDDING_MODEL` (по умолчанию `openai/text-embedding-3-small`),
+`EMBEDDING_BATCH` (32), `EMBEDDING_LIMIT`. Скрипт идемпотентен: берёт только строки
+с `embedding IS NULL`, прерывание не теряет прогресс. Поиск похожих — через `<=>`
+(косинус), порог для дублей подбирается на размеченной выборке (0,90–0,95).
+
+## Демо-данные без Битрикс24
+
+```bash
+cd api
+npm install
+npm run mock:bitrix            # мок REST на :5099
+# в другом терминале — БД должна быть запущена
+DATABASE_URL=postgres://bitrix:bitrix@localhost:5432/bitrix \
+BITRIX_WEBHOOK_URL=http://localhost:5099/rest/1/token \
+npx node src/etl/run.js
+```
+
+Мок отдаёт 123 компании, 57 контактов, 33 сделки с пагинацией по 50 записей и фильтром `>ID`.

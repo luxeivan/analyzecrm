@@ -1,0 +1,82 @@
+# Продовый стек: только БД, API и статика за nginx.
+# Запуск: docker compose -f docker-compose.prod.yml up -d --build
+name: bitrix-analyze
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: bitrix_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bitrix}
+      POSTGRES_USER: ${POSTGRES_USER:-bitrix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD обязателен}
+      TZ: ${TZ:-Europe/Moscow}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bitrix} -d ${POSTGRES_DB:-bitrix}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - bitrix_net
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.prod
+    container_name: bitrix_api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-bitrix}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bitrix}
+      NODE_ENV: production
+      PORT: 4000
+      TZ: ${TZ:-Europe/Moscow}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bitrix_net
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.prod
+    container_name: bitrix_web
+    environment:
+      TZ: ${TZ:-Europe/Moscow}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - bitrix_net
+
+  # Adminer по желанию: только с локального адреса сервера (SSH-туннель)
+  adminer:
+    image: adminer:latest
+    container_name: bitrix_adminer
+    profiles: ["tools"]
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DESIGN: dracula
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bitrix_net
+
+volumes:
+  pgdata:
+
+networks:
+  bitrix_net:
+    driver: bridge

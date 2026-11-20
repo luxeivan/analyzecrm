@@ -1,0 +1,26 @@
+{
+  "name": "bitrix-analyze-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch src/server/index.js",
+    "start": "node src/server/index.js",
+    "etl": "node src/etl/run.js",
+    "etl:full": "node src/etl/run.js --full",
+    "etl:delta": "node src/etl/run.js --modified",
+    "reconcile": "node src/etl/reconcile.js",
+    "embed": "node src/etl/embed.js",
+    "mock:bitrix": "node dev/mock-bitrix.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}

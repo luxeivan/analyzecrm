@@ -1,0 +1,104 @@
+name: bitrix-analyze
+
+x-node-common: &node-common
+  build:
+    context: ./api
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgres://${POSTGRES_USER:-bitrix}:${POSTGRES_PASSWORD:-bitrix}@db:5432/${POSTGRES_DB:-bitrix}
+    NODE_ENV: ${NODE_ENV:-development}
+    PORT: 4000
+    TZ: ${TZ:-Europe/Moscow}
+  volumes:
+    - ./api:/app
+    - /app/node_modules
+  depends_on:
+    db:
+      condition: service_healthy
+  networks:
+    - bitrix_net
+
+services:
+  # 1. Основная БД + pgvector (эмбеддинги для ИИ)
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: bitrix_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bitrix}
+      POSTGRES_USER: ${POSTGRES_USER:-bitrix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bitrix}
+      TZ: ${TZ:-Europe/Moscow}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bitrix} -d ${POSTGRES_DB:-bitrix}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - bitrix_net
+
+  # 2. Просмотр БД в браузере: http://localhost:8080
+  adminer:
+    image: adminer:latest
+    container_name: bitrix_adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DESIGN: dracula
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bitrix_net
+
+  # 3. Node.js: Backend API (постоянно) + ETL-скрипт (запускается вручную/compose run)
+  api:
+    <<: *node-common
+    container_name: bitrix_api
+    command: npm run dev
+    ports:
+      - "${API_PORT:-4000}:4000"
+    restart: unless-stopped
+
+  # 3b. Тот же образ, только для выгрузки данных: docker compose --profile etl run --rm etl
+  etl:
+    <<: *node-common
+    container_name: bitrix_etl
+    command: npm run etl
+    profiles: ["etl"]
+    restart: "no"
+
+  # 4. Frontend: React + Vite dev-сервер с HMR: http://localhost:5173
+  web:
+    build:
+      context: ./web
+    container_name: bitrix_web
+    environment:
+      VITE_API_PROXY: http://api:4000
+      TZ: ${TZ:-Europe/Moscow}
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - bitrix_net
+
+volumes:
+  pgdata:
+
+networks:
+  bitrix_net:
+    driver: bridge
