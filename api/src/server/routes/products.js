@@ -106,7 +106,7 @@ productsRouter.get('/products', async (req, res, next) => {
                              sum(r.quantity)::float8 AS qty,
                              sum(r.price * r.quantity)::float8 AS revenue,
                              count(DISTINCT r.deal_id)::int AS deals,
-                             count(DISTINCT d.company_id)::int AS companies
+                             count(DISTINCT d.company_id) FILTER (WHERE d.company_id > 0)::int AS companies
                         FROM deal_product_rows r
                         JOIN deals d ON d.id = r.deal_id
                        WHERE r.product_id IS NOT NULL ${wonSql} ${period.sql}
@@ -173,7 +173,7 @@ productsRouter.get('/products/analytics', async (req, res, next) => {
         `SELECT COALESCE(sum(r.price * r.quantity), 0)::float8 AS revenue,
                 COALESCE(sum(r.quantity), 0)::float8 AS qty,
                 count(DISTINCT r.deal_id)::int AS deals,
-                count(DISTINCT d.company_id)::int AS companies,
+                count(DISTINCT d.company_id) FILTER (WHERE d.company_id > 0)::int AS companies,
                 count(DISTINCT r.product_id)::int AS products
            ${from()}`,
         [...params],
@@ -196,7 +196,7 @@ productsRouter.get('/products/analytics', async (req, res, next) => {
               sum(r.quantity)::float8 AS qty,
               sum(r.price * r.quantity)::float8 AS revenue,
               count(DISTINCT r.deal_id)::int AS deals,
-              count(DISTINCT d.company_id)::int AS companies
+              count(DISTINCT d.company_id) FILTER (WHERE d.company_id > 0)::int AS companies
          ${from(true)}
         GROUP BY r.product_id, p.section_id
         ORDER BY revenue DESC NULLS LAST
@@ -309,7 +309,7 @@ productsRouter.get('/products/:id/report', async (req, res, next) => {
                 COALESCE(sum(r.quantity), 0)::float8 AS qty,
                 COALESCE(sum(r.discount_sum), 0)::float8 AS discount,
                 count(DISTINCT r.deal_id)::int AS deals,
-                count(DISTINCT d.company_id)::int AS companies,
+                count(DISTINCT d.company_id) FILTER (WHERE d.company_id > 0)::int AS companies,
                 min(d.date_create) AS first_at,
                 max(d.date_create) AS last_at
            ${base}`,
@@ -320,7 +320,7 @@ productsRouter.get('/products/:id/report', async (req, res, next) => {
                 sum(r.price * r.quantity)::float8 AS revenue,
                 sum(r.quantity)::float8 AS qty,
                 count(DISTINCT r.deal_id)::int AS deals,
-                count(DISTINCT d.company_id)::int AS companies
+                count(DISTINCT d.company_id) FILTER (WHERE d.company_id > 0)::int AS companies
            ${base}
           GROUP BY 1 ORDER BY 1`,
         [...params],
@@ -342,7 +342,7 @@ productsRouter.get('/products/:id/report', async (req, res, next) => {
              productId: id,
              extraJoin: 'LEFT JOIN companies co ON co.id = d.company_id',
            }).sql}
-             AND d.company_id IS NOT NULL
+             AND d.company_id > 0
           GROUP BY d.company_id
           ORDER BY revenue DESC NULLS LAST
           LIMIT $${companiesParams.length + 1}`,
@@ -404,7 +404,7 @@ productsRouter.get('/products/:id/report.csv', async (req, res, next) => {
               min(d.date_create)::date AS first_at,
               max(d.date_create)::date AS last_at
          ${base}
-           AND d.company_id IS NOT NULL
+           AND d.company_id > 0
         GROUP BY d.company_id
         ORDER BY revenue DESC NULLS LAST`,
       [...params],
@@ -445,7 +445,7 @@ productsRouter.get('/products/:id', async (req, res, next) => {
 
     const stats = await query(
       `SELECT count(DISTINCT r.deal_id)::int AS deals,
-              count(DISTINCT d.company_id)::int AS companies,
+              count(DISTINCT d.company_id) FILTER (WHERE d.company_id > 0)::int AS companies,
               COALESCE(sum(r.price * r.quantity), 0)::float8 AS revenue
          FROM deal_product_rows r JOIN deals d ON d.id = r.deal_id
         WHERE r.product_id = $1`,
