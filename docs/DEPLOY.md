@@ -189,12 +189,16 @@ cd web && npm run dev          # proxy по умолчанию на localhost:40
 Одной командой с локальной машины:
 
 ```bash
-./scripts/deploy.sh        # rsync + docker compose up -d --build + проверка health
+./scripts/deploy.sh        # доставка кода + docker compose up -d --build + проверка health
 ```
 
 Переменные: `DEPLOY_HOST` (по умолчанию `werstakoff@192.168.1.65`), `DEPLOY_DIR` (`/srv/analyzeCRM`),
-`DEPLOY_KEY` (`~/.ssh/bitrix_deploy`). Скрипт не копирует `.env`, `backup/`, `node_modules`, `.git`,
-не удаляет данные (БД в docker-volume).
+`DEPLOY_KEY` (`~/.ssh/bitrix_deploy`), `DEPLOY_MODE` (`auto|git|tar`).
+
+Режим `auto`: если на сервере работает `git ls-remote origin` (добавлен deploy key) — скрипт делает
+`git push` + `git reset --hard origin/main`; иначе копирует проект через `tar` по SSH (rsync на Windows
+обычно отсутствует). `.env`, `backup/`, `node_modules`, `.git` не передаются, данные в docker-volume
+не затрагиваются.
 
 ### Обновление через git (deploy key)
 
