@@ -11,3 +11,6 @@ api/*.log
 # дампы БД
 backup/
 *.dump
+
+# временные рендеры PDF
+pdfpage*.png
