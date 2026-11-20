@@ -211,17 +211,20 @@ export default function UsersCard() {
       >
         <Form form={form} layout="vertical" preserve={false} requiredMark={false}>
           <Form.Item label="Логин" name="login" rules={editing ? [] : [{ required: true, min: 3, message: 'Минимум 3 символа' }]}>
-            <Input disabled={Boolean(editing)} autoComplete="off" />
+            <Input disabled={Boolean(editing)} autoComplete="off" placeholder="например, ivanov" />
+          </Form.Item>
+          <Form.Item label="Имя" name="name" extra="Подпись в шапке панели. Необязательно.">
+            <Input autoComplete="off" placeholder="например, Иван Иванов" />
           </Form.Item>
           <Form.Item
             label={editing ? 'Новый пароль (если нужно сменить)' : 'Пароль'}
             name="password"
             rules={editing ? [{ min: 6, message: 'Минимум 6 символов' }] : [{ required: true, min: 6, message: 'Минимум 6 символов' }]}
           >
-            <Input.Password autoComplete="new-password" placeholder={editing ? 'оставьте пустым, чтобы не менять' : ''} />
-          </Form.Item>
-          <Form.Item label="Имя" name="name">
-            <Input />
+            <Input.Password
+              autoComplete="new-password"
+              placeholder={editing ? 'оставьте пустым, чтобы не менять' : 'минимум 6 символов'}
+            />
           </Form.Item>
           <Form.Item label="Роль" name="role">
             <Select

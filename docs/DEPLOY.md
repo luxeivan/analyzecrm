@@ -186,6 +186,33 @@ cd web && npm run dev          # proxy по умолчанию на localhost:40
 
 ## 8. Обновление кода на сервере
 
+Одной командой с локальной машины:
+
+```bash
+./scripts/deploy.sh        # rsync + docker compose up -d --build + проверка health
+```
+
+Переменные: `DEPLOY_HOST` (по умолчанию `werstakoff@192.168.1.65`), `DEPLOY_DIR` (`/srv/analyzeCRM`),
+`DEPLOY_KEY` (`~/.ssh/bitrix_deploy`). Скрипт не копирует `.env`, `backup/`, `node_modules`, `.git`,
+не удаляет данные (БД в docker-volume).
+
+### Обновление через git (deploy key)
+
+На сервере ключ `~/.ssh/github_deploy`, публичная часть добавлена в GitHub →
+**Settings → Deploy keys → Add deploy key** (read-only достаточно).
+
+```bash
+# первичная привязка каталога к репозиторию (один раз)
+cd /srv/analyzeCRM
+git fetch origin
+git checkout -f -B main origin/main      # .env и backup/ не трогаются (они в .gitignore)
+
+# обновление
+git pull --ff-only && docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Вручную:
+
 ```bash
 cd /opt/bitrix-analyze
 git pull

@@ -199,7 +199,16 @@ export default function App() {
             style={{ cursor: 'pointer', paddingInline: 8, whiteSpace: 'nowrap' }}
           >
             <UserOutlined />
-            {screens.md ? <Text>{user.name || user.login}</Text> : null}
+            {screens.md ? (
+              <Flex vertical style={{ lineHeight: 1.2 }}>
+                <Text>{user.name || user.login}</Text>
+                {user.name ? (
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    @{user.login}
+                  </Text>
+                ) : null}
+              </Flex>
+            ) : null}
             <Tag color={user.role === 'admin' ? 'blue' : 'default'} style={{ marginInlineEnd: 0 }}>
               {user.role === 'admin' ? 'admin' : 'user'}
             </Tag>

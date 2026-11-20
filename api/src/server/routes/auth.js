@@ -11,6 +11,16 @@ import {
 
 export const authRouter = Router();
 
+/**
+ * Имя показывается в шапке панели, поэтому защищаемся от случайного ввода пароля
+ * в поле «Имя»: если значение совпадает с паролем — сохраняем пустое имя.
+ */
+const cleanName = (rawName, password) => {
+  const name = String(rawName ?? '').trim() || null;
+  if (name && password && name === String(password)) return null;
+  return name;
+};
+
 const publicUser = (row) => ({
   id: row.id,
   login: row.login,
@@ -72,7 +82,7 @@ authRouter.post('/users', requireAdmin, async (req, res, next) => {
   try {
     const login = String(req.body?.login ?? '').trim();
     const password = String(req.body?.password ?? '');
-    const name = String(req.body?.name ?? '').trim() || null;
+    const name = cleanName(req.body?.name, password);
     const role = req.body?.role === 'admin' ? 'admin' : 'user';
 
     if (login.length < 3) return res.status(400).json({ error: 'Логин короче 3 символов' });
@@ -104,7 +114,7 @@ authRouter.patch('/users/:id', requireAdmin, async (req, res, next) => {
 
     if (req.body?.name !== undefined) {
       updates.push(`name = $${values.length + 1}`);
-      values.push(String(req.body.name).trim() || null);
+      values.push(cleanName(req.body.name, req.body?.password));
     }
 
     if (req.body?.role !== undefined) {

@@ -7,3 +7,7 @@ pgdata/
 
 # логи фоновых задач (reconcile/embed)
 api/*.log
+
+# дампы БД
+backup/
+*.dump
