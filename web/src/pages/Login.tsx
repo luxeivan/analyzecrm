@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LockOutlined, MoonOutlined, SunOutlined, UserOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Flex, Form, Input, Segmented, Typography, theme as antdTheme } from 'antd';
+import Logo from '../components/Logo';
 import { useAuth } from '../auth';
 import { useThemeMode, type ThemeMode } from '../theme';
 
@@ -45,20 +46,7 @@ export default function LoginPage() {
       <Card style={{ width: 380 }} styles={{ body: { padding: 28 } }}>
         <Flex vertical gap={4} style={{ marginBottom: 20 }}>
           <Flex align="center" gap={10}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                background: token.colorPrimary,
-                color: '#fff',
-                display: 'grid',
-                placeItems: 'center',
-                fontWeight: 700,
-              }}
-            >
-              B
-            </div>
+            <Logo size={32} />
             <Title level={4} style={{ margin: 0 }}>
               CRM Analyzer
             </Title>

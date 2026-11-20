@@ -57,6 +57,26 @@ services:
     networks:
       - bitrix_net
 
+  # Векторизация (эмбеддинги) — отдельный контейнер, чтобы пересборка api её не убивала:
+  #   docker compose -f docker-compose.prod.yml --profile tools run -d --rm --name bitrix_embed embed
+  embed:
+    image: bitrix-analyze-api
+    profiles: ["tools"]
+    container_name: bitrix_embed
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-bitrix}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bitrix}
+      NODE_ENV: production
+      TZ: ${TZ:-Europe/Moscow}
+    command: ["node", "src/etl/embed.js", "--index"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - bitrix_net
+
   # Adminer по желанию: только с локального адреса сервера (SSH-туннель)
   adminer:
     image: adminer:latest

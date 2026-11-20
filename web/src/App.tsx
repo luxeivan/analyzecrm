@@ -21,6 +21,7 @@ import {
 } from '@ant-design/icons';
 import { Dropdown, Flex, Grid, Layout, Menu, Segmented, Spin, Tag, Typography, theme as antdTheme } from 'antd';
 import type { MenuProps } from 'antd';
+import Logo from './components/Logo';
 import Dashboard from './pages/Dashboard';
 import AnalyticsPage from './pages/Analytics';
 import AdminPage from './pages/Admin';
@@ -147,21 +148,7 @@ export default function App() {
         }}
       >
         <Flex align="center" gap={10} style={{ flexShrink: 0 }}>
-          <div
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 8,
-              background: token.colorPrimary,
-              color: '#fff',
-              display: 'grid',
-              placeItems: 'center',
-              fontWeight: 700,
-              fontSize: 15,
-            }}
-          >
-            B
-          </div>
+          <Logo size={30} />
           {screens.sm ? (
             <Text strong style={{ whiteSpace: 'nowrap' }}>
               CRM Analyzer
