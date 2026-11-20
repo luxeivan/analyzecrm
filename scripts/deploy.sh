@@ -44,8 +44,10 @@ else
 fi
 
 # --- сборка и запуск -------------------------------------------------------
+# Без --remove-orphans: контейнеры, запущенные через `--profile tools run`
+# (векторизация, ETL каталога), не должны убиваться деплоем.
 echo "==> build + up ($MODE)"
-$SSH "$HOST" "cd $TARGET && docker compose -f docker-compose.prod.yml up -d --build --remove-orphans"
+$SSH "$HOST" "cd $TARGET && docker compose -f docker-compose.prod.yml up -d --build"
 
 echo "==> health"
 $SSH "$HOST" "sleep 5; curl -fsS -m 10 http://127.0.0.1:8090/api/health" || {
