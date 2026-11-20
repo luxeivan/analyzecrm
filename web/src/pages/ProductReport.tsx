@@ -7,8 +7,10 @@ import {
   Col,
   Empty,
   Flex,
+  Input,
   Row,
   Segmented,
+  Select,
   Space,
   Statistic,
   Table,
@@ -75,6 +77,8 @@ export default function ProductReportPage() {
   const [group, setGroup] = useState('month');
   const [stage, setStage] = useState<'won' | 'all'>('won');
   const [report, setReport] = useState<ProductReport | null>(null);
+  const [options, setOptions] = useState<{ value: number; label: string }[]>([]);
+  const [companyQuery, setCompanyQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +86,25 @@ export default function ProductReportPage() {
     () => ({ ...presetRange(preset), group, stage }),
     [preset, group, stage],
   );
+
+  // Быстрый переход к другому товару: поиск по каталогу прямо в шапке отчёта
+  const searchProducts = useCallback((value: string) => {
+    api
+      .products({ q: value.trim(), limit: 20, sort: 'revenue', dir: 'desc', stage: 'all' })
+      .then((page) =>
+        setOptions(
+          page.items.map((item) => ({
+            value: item.id,
+            label: `${item.name}${item.revenue ? ` · ${money(item.revenue)}` : ''}`,
+          })),
+        ),
+      )
+      .catch(() => setOptions([]));
+  }, []);
+
+  useEffect(() => {
+    searchProducts('');
+  }, [searchProducts]);
 
   const load = useCallback(() => {
     if (!id) return;
@@ -107,6 +130,12 @@ export default function ProductReportPage() {
   if (!report) return <Card loading={loading} />;
 
   const { product, totals, timeline, companies } = report;
+  const needle = companyQuery.trim().toLowerCase();
+  const filteredCompanies = needle
+    ? companies.filter((row) =>
+        `${row.title ?? ''} ${row.city ?? ''} ${row.industry ?? ''}`.toLowerCase().includes(needle),
+      )
+    : companies;
   const currency = product.currency_id || 'RUB';
   const measure = product.measure ? '' : '';
 
@@ -201,10 +230,14 @@ export default function ProductReportPage() {
     },
     {
       title: 'Компания',
-      dataIndex: 'company_id',
-      width: 220,
-      render: (value: number | null) =>
-        value ? <Link to={`/companies/${value}`}>#{value}</Link> : <Text type="secondary">—</Text>,
+      dataIndex: 'company_title',
+      width: 240,
+      render: (value: string | null, row) =>
+        row.company_id ? (
+          <Link to={`/companies/${row.company_id}`}>{value || `Компания #${row.company_id}`}</Link>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
     },
     {
       title: 'Кол-во',
@@ -253,6 +286,17 @@ export default function ProductReportPage() {
           </Space>
 
           <Space wrap>
+            <Select
+              showSearch
+              allowClear
+              placeholder="Выбрать другой товар"
+              value={undefined}
+              style={{ minWidth: 280 }}
+              options={options}
+              filterOption={false}
+              onSearch={searchProducts}
+              onChange={(value) => value && navigate(`/products/${value}`)}
+            />
             <Segmented value={preset} onChange={(value) => setPreset(String(value))} options={PRESETS} />
             <Segmented value={group} onChange={(value) => setGroup(String(value))} options={GROUPS} />
             <Segmented
@@ -344,7 +388,7 @@ export default function ProductReportPage() {
         <Col xs={24} xl={16}>
           <Card
             size="small"
-            title={`Компании, которые покупали (${companies.length})`}
+            title={`Компании, которые покупали (${filteredCompanies.length})`}
             extra={
               <Tooltip title="В скобках у сделок — количество успешных">
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -353,11 +397,18 @@ export default function ProductReportPage() {
               </Tooltip>
             }
           >
+            <Input
+              allowClear
+              placeholder="Фильтр по компании или городу"
+              value={companyQuery}
+              onChange={(event) => setCompanyQuery(event.target.value)}
+              style={{ marginBottom: 12, maxWidth: 320 }}
+            />
             <Table
               size="small"
               rowKey="id"
               loading={loading}
-              dataSource={companies}
+              dataSource={filteredCompanies}
               columns={companyColumns}
               pagination={{ pageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
               scroll={{ x: 900 }}

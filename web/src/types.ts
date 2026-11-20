@@ -690,6 +690,7 @@ export interface ProductReportDeal {
   stage_id: string | null;
   stage: string | null;
   company_id: number | null;
+  company_title?: string | null;
   opportunity: number | null;
   quantity: number;
   revenue: number;

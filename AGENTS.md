@@ -39,6 +39,7 @@ api/
     fields.js              # crm.*.fields + crm.userfield.list + crm.status.list, upsert метаданных
     transform.js           # raw API -> строка таблицы (columns описаны здесь)
     load.js                # bulk upsert страницы + sync_state (курсор/статус)
+    productrows.js         # состав сделок через batch (crm.deal.productrows.get)
     embed.js               # эмбеддинги pgvector через Polza.ai (--only, --limit, --force, --index)
     reconcile.js           # сверка удалённых через batch (50×50 ID), аудит в deleted_records
     schema.js              # ensureSchema()
@@ -47,6 +48,7 @@ api/
     crm.js                 # кэш метаданных (60 c) + расшифровка enum/статусов + describeEntity
     query.js               # paging / buildFilters / applyOrder (whitelists!)
     routes/{meta,entities,graph,stats,ai}.js
+    routes/products.js     # товары: рейтинг, категории, отчёт по товару (компании/динамика)
   dev/mock-bitrix.js       # мок REST Битрикс24 для проверки ETL без портала
 
 web/
@@ -55,6 +57,8 @@ web/
   src/api.ts               # типизированный клиент /api
   src/types.ts             # контракты ответов API
   src/pages/{Dashboard,Companies,Contacts,CompanyCard,ContactCard,Graph}.tsx
+  src/pages/Products.tsx   # рейтинг товаров + топ категорий
+  src/pages/ProductReport.tsx # отчёт по товару: динамика, компании-покупатели, CSV
   src/components/{SyncControls,GraphView}.tsx
 ```
 
@@ -102,6 +106,11 @@ docker compose --profile etl run --rm etl      # первая полная вы�
 - `bitrix_enum` — `(entity, field_code, enum_id) → value` (расшифровка `enumeration`).
 - `crm_status` — `crm.status.list` (источники, стадии, `semantics` S/F).
 - `sync_state` — курсор `last_id`, `status`, `last_error` по сущности.
+- `products(id, name, section_id, price, currency_id, measure, active, code, vat_id, description, search_text, raw, ...)`.
+- `product_sections(id, name, parent_id, sort, raw)` — иерархия каталога (глубина 4+ уровня).
+- `deal_product_rows(deal_id, line_id, product_id, product_name, price, price_netto, price_account,
+  quantity, discount_sum, discount_rate, tax_rate, measure_name, type, raw)` — состав сделки;
+  сумма строки = `price * quantity`, цены исторические (на момент продажи).
 
 `PHONE` и `EMAIL` — мультиполя Bitrix и **не входят** в `select: ['*']`; ETL добавляет их явно
 (`MULTIFIELD_SELECT` в `run.js`). Если их убрать, телефоны/почты снова окажутся пустыми.
@@ -124,6 +133,17 @@ GIN `pg_trgm` — поэтому поиск работает по любым п�
    - `fetchAll()`: страница 50 записей → `transformRow()` → `insertPage()` (bulk upsert в транзакции) →
      обновление `sync_state` в **той же** транзакции → `sleep(ETL_SLEEP_MS)`.
 3. Ошибка сущности не останавливает остальные: пишется в `sync_state.last_error`, `process.exitCode = 1`.
+
+Каталог и состав сделок:
+
+- `product` (46 тыс. записей) и `product_section` (1 тыс.) — обычные сущности `ENTITIES`, keyset по ID;
+  единицы измерения (`MEASURE`) расшифровываются через `crm.measure.list` → `bitrix_enum`.
+- `deal_products` — псевдо-сущность (`custom: true`): таблицы-страницы нет, загрузчик
+  `etl/productrows.js` берёт ID уже выгруженных сделок из таблицы `deals` (keyset по ID) и запрашивает
+  `crm.deal.productrows.get` через **batch по 30 сделок** (метод работает только по одной сделке).
+  Строки сделки перезаписываются целиком (`DELETE` + `INSERT` в одной транзакции), удаляются только
+  у сделок, по которым получен успешный ответ. Дельта — по `deals.date_modify`.
+- Товары/разделы не участвуют в векторизации, дублях и сверке удалённых (у них нет эмбеддингов).
 
 Жёсткие инварианты (`api/src/bitrix.js`):
 
@@ -169,13 +189,19 @@ GIN `pg_trgm` — поэтому поиск работает по любым п�
 | `DELETE /users/:id` | — | удаление (admin; системного админа и себя нельзя) |
 | `GET /fields?entity=company\|contact\|deal\|lead` | `refresh=1` сбросить кэш | поля + `items` для enum/status |
 | `GET /companies` | `q, page, limit, sort, dir, industry, source, city, region, assigned_by_id, UF_*` | `{items, page, limit, total, pages}` |
-| `GET /companies/:id` | — | профиль + `fields[]` + контакты + сделки (до 500) + `deals_total {count, won, open, sum, open_sum}` + `raw` |
+| `GET /companies/:id` | — | профиль + `fields[]` + контакты + сделки (до 500) + `products[]` (что покупала) + `deals_total {count, won, open, sum, open_sum}` + `raw` |
 | `GET /contacts` | `q, page, limit, sort, dir, company_id, source, city, without_company=1, UF_*` | список с `company_title` |
 | `GET /contacts/:id` | — | контакт + компания + сделки (до 200) + `deals_total` + `fields[]` |
 | `GET /deals` | `q, page, limit, sort, dir, company_id, contact_id, stage, category` | список с названиями стадий |
-| `GET /deals/:id` | — | сделка + `fields[]` |
+| `GET /deals/:id` | — | сделка + `fields[]` + `products[]` + `products_total` |
 | `GET /leads` | `q, page, limit, sort, dir, company_id, contact_id, status, source, city` | список с названиями статусов и источников |
 | `GET /leads/:id` | — | лид + компания + контакт + `fields[]` |
+| `GET /products` | `q, section, sold, active, stage=won\|all, from, to, page, limit, sort, dir` | товары с продажами (выручка/кол-во/сделки/компании) |
+| `GET /products/analytics` | `from, to, group=month\|quarter\|year, stage, limit` | KPI, топ товаров, топ категорий (свёртка по дереву), динамика |
+| `GET /products/:id` | — | товар + путь по разделам + итоги |
+| `GET /products/:id/report` | `from, to, group, stage, limit` | отчёт: итоги, динамика, компании-покупатели, последние сделки |
+| `GET /products/:id/report.csv` | `from, to, stage` | CSV компаний-покупателей (разделитель `;`, BOM для Excel) |
+| `GET /product-sections` | — | разделы каталога (плоский список + число товаров) |
 | `GET /analytics/overview` | `from`, `to` (ISO-даты периода) | покрытие, выручка/win rate, годы, лиды, источники, топ клиентов, качество данных, рекомендации; без параметров — всё время |
 | `GET /embed/status` | — | прогресс векторизации из `service_state['embed']` |
 | `GET /admin/overview` | — | размер БД, таблицы/векторы, индексы, настройки, состояние выгрузки и эмбеддингов |

@@ -299,6 +299,7 @@ productsRouter.get('/products/:id/report', async (req, res, next) => {
     const group = groupSql(req);
 
     const params = [];
+    const dealsParams = [];
     const { sql: base, period } = reportBase(params, req, { productId: id });
 
     const [totals, timeline, companies, deals] = await Promise.all([
@@ -344,13 +345,13 @@ productsRouter.get('/products/:id/report', async (req, res, next) => {
         [...params, limit],
       ),
       query(
-        `SELECT r.deal_id, d.title AS deal_title, d.stage_id, d.company_id,
+        `SELECT r.deal_id, d.title AS deal_title, d.stage_id, d.company_id, co.title AS company_title,
                 d.opportunity::float8 AS opportunity, r.quantity::float8 AS quantity,
                 (r.price * r.quantity)::float8 AS revenue, d.date_create
-           ${base}
+           ${reportBase(dealsParams, req, { productId: id, extraJoin: 'LEFT JOIN companies co ON co.id = d.company_id' }).sql}
           ORDER BY d.date_create DESC
           LIMIT 20`,
-        [...params],
+        [...dealsParams],
       ),
     ]);
 
@@ -362,7 +363,7 @@ productsRouter.get('/products/:id/report', async (req, res, next) => {
         section_path: await sectionPath(product.section_id),
         price: product.price === null ? null : Number(product.price),
         currency_id: product.currency_id,
-        measure: product.measure,
+        measure: decodeEnum(meta, 'product', 'MEASURE', product.measure),
         active: product.active,
         raw: product.raw,
       },

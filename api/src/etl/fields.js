@@ -105,6 +105,25 @@ export async function loadEntityFields(entity, fieldsMethod) {
     console.warn(`[etl] ${entity}: crm.userfield.list недоступен (${err.message})`);
   }
 
+  // Единицы измерения товара: MEASURE хранит ID из справочника crm.measure.list
+  if (entity === 'product') {
+    try {
+      const measures = await call('crm.measure.list');
+      for (const measure of measures.result || []) {
+        const id = measure.ID ?? measure.id;
+        if (id === undefined) continue;
+        const existing = defs.get('MEASURE');
+        const items = existing?.items ? [...existing.items] : [];
+        if (!items.some((item) => String(item.ID) === String(id))) {
+          items.push({ ID: String(id), VALUE: measure.SYMBOL ?? measure.NAME ?? String(id) });
+        }
+        defs.set('MEASURE', { def: existing?.def || { type: 'enumeration', title: 'Единица измерения' }, items });
+      }
+    } catch (err) {
+      console.warn(`[etl] product: crm.measure.list недоступен (${err.message})`);
+    }
+  }
+
   const rows = [];
   const enums = [];
   const ufKeys = [];
