@@ -401,8 +401,8 @@ productsRouter.get('/products/:id/report.csv', async (req, res, next) => {
               sum(r.price * r.quantity)::float8 AS revenue,
               sum(r.quantity)::float8 AS qty,
               count(DISTINCT r.deal_id)::int AS deals,
-              min(d.date_create)::date AS first_at,
-              max(d.date_create)::date AS last_at
+              to_char(min(d.date_create), 'YYYY-MM-DD') AS first_at,
+              to_char(max(d.date_create), 'YYYY-MM-DD') AS last_at
          ${base}
            AND d.company_id > 0
         GROUP BY d.company_id

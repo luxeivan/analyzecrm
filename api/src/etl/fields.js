@@ -115,7 +115,8 @@ export async function loadEntityFields(entity, fieldsMethod) {
         const existing = defs.get('MEASURE');
         const items = existing?.items ? [...existing.items] : [];
         if (!items.some((item) => String(item.ID) === String(id))) {
-          items.push({ ID: String(id), VALUE: measure.SYMBOL ?? measure.NAME ?? String(id) });
+          const title = measure.SYMBOL_RUS || measure.MEASURE_TITLE || measure.SYMBOL_INTL || String(id);
+          items.push({ ID: String(id), VALUE: String(title) });
         }
         defs.set('MEASURE', { def: existing?.def || { type: 'enumeration', title: 'Единица измерения' }, items });
       }
