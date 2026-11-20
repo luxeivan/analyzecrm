@@ -13,6 +13,10 @@
 Предложение по pgvector и LLM — в [pgvector-i-llm-analiz-crm.pdf](./pgvector-i-llm-analiz-crm.pdf)
 (генератор: `scripts/make_analytics_pdf.py`).
 
+
+**Что это и сколько стоит эксплуатировать:** [`docs/SERVICE.md`](docs/SERVICE.md) — подробное
+описание функций, замеры производительности, юнит-экономика, модели продажи и план доработок.
+
 ## Запуск
 
 ```bash
