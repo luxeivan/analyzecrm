@@ -104,9 +104,63 @@ export const ENTITIES = {
       'synced_at',
     ],
   },
+  product: {
+    key: 'product',
+    table: 'products',
+    method: 'crm.product.list',
+    fieldsMethod: 'crm.product.fields',
+    columns: [
+      'id',
+      'name',
+      'section_id',
+      'price',
+      'currency_id',
+      'measure',
+      'active',
+      'code',
+      'vat_id',
+      'description',
+      'search_text',
+      'raw',
+      'date_create',
+      'date_modify',
+      'synced_at',
+    ],
+  },
+  product_section: {
+    key: 'product_section',
+    table: 'product_sections',
+    method: 'crm.productsection.list',
+    fieldsMethod: 'crm.productsection.fields',
+    columns: ['id', 'name', 'parent_id', 'sort', 'raw', 'synced_at'],
+  },
+  // Состав сделок: собственной таблицы-страницы нет, загрузчик в etl/productrows.js
+  deal_products: {
+    key: 'deal_products',
+    table: 'deal_product_rows',
+    custom: true,
+  },
 };
 
 export const ENTITY_LIST = Object.values(ENTITIES);
+
+/** Колонки строк товаров в сделке (порядок важен: см. schema.sql). */
+export const DEAL_PRODUCT_ROW_COLUMNS = [
+  'deal_id',
+  'line_id',
+  'product_id',
+  'product_name',
+  'price',
+  'price_netto',
+  'price_account',
+  'quantity',
+  'discount_sum',
+  'discount_rate',
+  'tax_rate',
+  'measure_name',
+  'type',
+  'raw',
+];
 
 const json = (value) => JSON.stringify(value ?? []);
 
@@ -205,7 +259,60 @@ export function transformRow(entityKey, raw) {
         syncedAt,
       ];
 
+    case 'product':
+      return [
+        Number(raw.ID),
+        toText(raw.NAME) || `Товар #${raw.ID}`,
+        toNumberOrNull(raw.SECTION_ID),
+        toNumberOrNull(raw.PRICE),
+        toText(raw.CURRENCY_ID),
+        toText(raw.MEASURE),
+        String(raw.ACTIVE ?? 'Y').toUpperCase() !== 'N',
+        toText(raw.CODE),
+        toNumberOrNull(raw.VAT_ID),
+        toText(raw.DESCRIPTION, 4000),
+        searchText,
+        JSON.stringify(raw),
+        dateCreate,
+        dateModify,
+        syncedAt,
+      ];
+
+    case 'product_section':
+      return [
+        Number(raw.ID),
+        toText(raw.NAME) || `Раздел #${raw.ID}`,
+        toNumberOrNull(raw.SECTION_ID),
+        toNumberOrNull(raw.SORT),
+        JSON.stringify(raw),
+        syncedAt,
+      ];
+
     default:
       throw new Error(`Неизвестная сущность: ${entityKey}`);
   }
+}
+
+/**
+ * Строка товара в сделке (crm.deal.productrows.get) -> массив values
+ * в порядке DEAL_PRODUCT_ROW_COLUMNS.
+ */
+export function transformProductRow(dealId, raw, index = 0) {
+  const lineId = toNumberOrNull(raw.ID) ?? index + 1;
+  return [
+    Number(dealId),
+    lineId,
+    toNumberOrNull(raw.PRODUCT_ID) || null,
+    toText(raw.PRODUCT_NAME) || toText(raw.ORIGINAL_PRODUCT_NAME) || 'Товар',
+    toNumberOrNull(raw.PRICE),
+    toNumberOrNull(raw.PRICE_EXCLUSIVE),
+    toNumberOrNull(raw.PRICE_ACCOUNT),
+    toNumberOrNull(raw.QUANTITY),
+    toNumberOrNull(raw.DISCOUNT_SUM),
+    toNumberOrNull(raw.DISCOUNT_RATE),
+    toNumberOrNull(raw.TAX_RATE),
+    toText(raw.MEASURE_NAME),
+    toNumberOrNull(raw.TYPE),
+    JSON.stringify(raw),
+  ];
 }

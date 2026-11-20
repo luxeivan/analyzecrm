@@ -210,3 +210,61 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ---------------------------------------------------------------------------
+-- Каталог товаров (crm.product / crm.productsection) и состав сделок
+-- (crm.deal.productrows.get). Цены и количества берутся из строки сделки:
+-- это историческая цена на момент продажи, а не текущая цена карточки товара.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS product_sections (
+  id         BIGINT PRIMARY KEY,
+  name       TEXT,
+  parent_id  BIGINT,
+  sort       INTEGER,
+  raw        JSONB NOT NULL,
+  synced_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS product_sections_parent ON product_sections (parent_id);
+CREATE INDEX IF NOT EXISTS product_sections_name_trgm ON product_sections USING gin (name gin_trgm_ops);
+
+CREATE TABLE IF NOT EXISTS products (
+  id          BIGINT PRIMARY KEY,
+  name        TEXT,
+  section_id  BIGINT,
+  price       NUMERIC(18, 4),
+  currency_id TEXT,
+  measure     TEXT,
+  active      BOOLEAN NOT NULL DEFAULT true,
+  code        TEXT,
+  vat_id      BIGINT,
+  description TEXT,
+  search_text TEXT NOT NULL DEFAULT '',
+  raw         JSONB NOT NULL,
+  date_create TIMESTAMPTZ,
+  date_modify TIMESTAMPTZ,
+  synced_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS products_section   ON products (section_id);
+CREATE INDEX IF NOT EXISTS products_active    ON products (active);
+CREATE INDEX IF NOT EXISTS products_name_trgm ON products USING gin (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS products_search_trgm ON products USING gin (search_text gin_trgm_ops);
+
+CREATE TABLE IF NOT EXISTS deal_product_rows (
+  deal_id       BIGINT NOT NULL,
+  line_id       BIGINT NOT NULL,
+  product_id    BIGINT,
+  product_name  TEXT,
+  price         NUMERIC(18, 4),
+  price_netto   NUMERIC(18, 4),
+  price_account NUMERIC(18, 4),
+  quantity      NUMERIC(18, 4),
+  discount_sum  NUMERIC(18, 4),
+  discount_rate NUMERIC(18, 4),
+  tax_rate      NUMERIC(18, 4),
+  measure_name  TEXT,
+  type          SMALLINT,
+  raw           JSONB NOT NULL,
+  synced_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (deal_id, line_id)
+);
+CREATE INDEX IF NOT EXISTS deal_product_rows_product ON deal_product_rows (product_id);

@@ -19,7 +19,7 @@ import type { TableProps } from 'antd';
 import { api } from '../api';
 import SimilarBlock from '../components/SimilarBlock';
 import { fmtDate, isLostStage, isWonStage, money } from '../format';
-import type { DealDetail, ProfileField } from '../types';
+import type { DealDetail, DealProductRow, ProfileField } from '../types';
 
 const { Title, Text } = Typography;
 
@@ -127,6 +127,75 @@ export default function DealCard() {
           </Card>
         </Col>
       </Row>
+
+      {deal.products?.length ? (
+        <Card
+          size="small"
+          title={`Товары в сделке (${deal.products_total.lines})`}
+          extra={
+            <Space size={12} wrap>
+              <Text type="secondary">
+                Количество: {Number(deal.products_total.qty ?? 0).toLocaleString('ru-RU')}
+              </Text>
+              {deal.products_total.discount ? (
+                <Text type="secondary">Скидки: {money(deal.products_total.discount, deal.currency_id)}</Text>
+              ) : null}
+              <Text strong>Итого: {money(deal.products_total.sum, deal.currency_id)}</Text>
+            </Space>
+          }
+        >
+          <Table<DealProductRow>
+            rowKey={(row, index) => `${row.id ?? 'x'}-${index}`}
+            size="small"
+            pagination={false}
+            scroll={{ y: 360 }}
+            dataSource={deal.products}
+            columns={[
+              {
+                title: 'Товар',
+                dataIndex: 'name',
+                render: (value: string | null, row) =>
+                  row.in_catalog && row.id ? (
+                    <Link to={`/products/${row.id}`}>{value}</Link>
+                  ) : (
+                    <Space size={4}>
+                      <Text>{value}</Text>
+                      <Tag>нет в каталоге</Tag>
+                    </Space>
+                  ),
+              },
+              {
+                title: 'Раздел',
+                dataIndex: 'section_name',
+                width: 200,
+                render: (value: string | null) => value || '—',
+              },
+              {
+                title: 'Кол-во',
+                dataIndex: 'quantity',
+                align: 'right',
+                width: 100,
+                render: (value: number, row) =>
+                  `${Number(value).toLocaleString('ru-RU')}${row.measure_name ? ` ${row.measure_name}` : ''}`,
+              },
+              {
+                title: 'Цена',
+                dataIndex: 'price',
+                align: 'right',
+                width: 120,
+                render: (value: number) => money(value, deal.currency_id),
+              },
+              {
+                title: 'Сумма',
+                dataIndex: 'revenue',
+                align: 'right',
+                width: 140,
+                render: (value: number) => <Text strong>{money(value, deal.currency_id)}</Text>,
+              },
+            ]}
+          />
+        </Card>
+      ) : null}
 
       <Flex gap={8} wrap>
         {deal.company_id ? (

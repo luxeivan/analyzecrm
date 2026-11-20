@@ -50,6 +50,9 @@ const ENTITY_LABELS: Record<string, string> = {
   contact: 'Контакты',
   lead: 'Лиды',
   deal: 'Сделки',
+  product: 'Товары',
+  product_section: 'Разделы каталога',
+  deal_products: 'Товары в сделках',
 };
 
 const ENTITY_COLORS: Record<string, string> = {
@@ -57,6 +60,9 @@ const ENTITY_COLORS: Record<string, string> = {
   contact: '#722ed1',
   lead: '#52c41a',
   deal: '#faad14',
+  product: '#13c2c2',
+  product_section: '#8c8c8c',
+  deal_products: '#eb2f96',
 };
 
 const PROGRESS_LABELS: Record<string, string> = {

@@ -21,7 +21,7 @@ import type { TableProps } from 'antd';
 import { api } from '../api';
 import SimilarBlock from '../components/SimilarBlock';
 import { fmtDate, fmtDay, isLostStage, isWonStage, money } from '../format';
-import type { CompanyDetail, ProfileField } from '../types';
+import type { CompanyDetail, CompanyProduct, ProfileField } from '../types';
 
 const { Title, Text } = Typography;
 
@@ -307,6 +307,55 @@ export default function CompanyCard() {
           ]}
         />
       </Card>
+
+      {company.products?.length ? (
+        <Card
+          size="small"
+          title={`Что покупала компания (${company.products.length})`}
+          extra={<Text type="secondary">клик по товару — отчёт: динамика и другие покупатели</Text>}
+        >
+          <Table<CompanyProduct>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            scroll={{ y: 360 }}
+            dataSource={company.products}
+            columns={[
+              {
+                title: 'Товар',
+                dataIndex: 'name',
+                render: (value: string | null, row) => <Link to={`/products/${row.id}`}>{value || `Товар #${row.id}`}</Link>,
+              },
+              {
+                title: 'Кол-во',
+                dataIndex: 'qty',
+                align: 'right',
+                width: 110,
+                render: (value: number) => Number(value).toLocaleString('ru-RU'),
+              },
+              {
+                title: 'Выручка',
+                dataIndex: 'revenue',
+                align: 'right',
+                width: 140,
+                render: (value: number) => <Text strong>{money(value)}</Text>,
+              },
+              {
+                title: 'Сделок',
+                dataIndex: 'deals',
+                align: 'right',
+                width: 90,
+              },
+              {
+                title: 'Последняя покупка',
+                dataIndex: 'last_at',
+                width: 150,
+                render: (value: string | null) => fmtDay(value),
+              },
+            ]}
+          />
+        </Card>
+      ) : null}
 
       {summary ? (
         <Card

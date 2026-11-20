@@ -18,6 +18,7 @@ import {
   SearchOutlined,
   SunOutlined,
   TeamOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Flex, Grid, Layout, Menu, Segmented, Spin, Tag, Typography, theme as antdTheme } from 'antd';
 import type { MenuProps } from 'antd';
@@ -25,6 +26,8 @@ import Logo from './components/Logo';
 import Dashboard from './pages/Dashboard';
 import AnalyticsPage from './pages/Analytics';
 import AdminPage from './pages/Admin';
+import ProductsPage from './pages/Products';
+import ProductReportPage from './pages/ProductReport';
 import SearchPage from './pages/Search';
 import LookAlikePage from './pages/LookAlike';
 import AssistantPage from './pages/Assistant';
@@ -64,6 +67,7 @@ export default function App() {
     if (location.pathname.startsWith('/assistant')) return '/assistant';
     if (location.pathname.startsWith('/duplicates')) return '/duplicates';
     if (location.pathname.startsWith('/admin')) return '/admin';
+    if (location.pathname.startsWith('/products')) return '/products';
     if (location.pathname.startsWith('/companies')) return '/companies';
     return '/';
   }, [location.pathname]);
@@ -85,6 +89,7 @@ export default function App() {
         { key: '/contacts', icon: <TeamOutlined />, label: 'Контакты' },
         { key: '/deals', icon: <DollarCircleOutlined />, label: 'Сделки' },
         { key: '/leads', icon: <BulbOutlined />, label: 'Лиды' },
+        { key: '/products', icon: <TagsOutlined />, label: 'Товары' },
       ],
     },
     {
@@ -229,6 +234,8 @@ export default function App() {
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/contacts/:id" element={<ContactCard />} />
           <Route path="/deals" element={<Deals />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/products/:id" element={<ProductReportPage />} />
           <Route path="/deals/:id" element={<DealCard />} />
           <Route path="/leads" element={<Leads />} />
           <Route path="/leads/:id" element={<LeadCard />} />

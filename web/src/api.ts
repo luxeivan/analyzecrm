@@ -19,6 +19,10 @@ import type {
   DuplicatePairDetails,
   DuplicateGroupsPage,
   DuplicateGroupDetails,
+  ProductAnalytics,
+  ProductReport,
+  ProductRow,
+  ProductSection,
   FieldDef,
   GraphData,
   LeadDetail,
@@ -100,6 +104,30 @@ export const api = {
   deal: (id: string | number) => get<DealDetail>(`/deals/${id}`),
   leads: (params: Params) => get<Page<LeadRow>>('/leads', params),
   lead: (id: string | number) => get<LeadDetail>(`/leads/${id}`),
+
+  products: (params: Params) => get<Page<ProductRow>>('/products', params),
+  productSections: () => get<{ items: ProductSection[] }>('/product-sections'),
+  productAnalytics: (params: Params) => get<ProductAnalytics>('/products/analytics', params),
+  product: (id: string | number) => get<ProductRow & { section_path: { id: number; name: string | null }[] }>(`/products/${id}`),
+  productReport: (id: string | number, params: Params) => get<ProductReport>(`/products/${id}/report`, params),
+  productReportCsv: async (id: string | number, params: Params = {}) => {
+    const url = new URL(`${BASE}/products/${id}/report.csv`, window.location.origin);
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === null || value === '') continue;
+      url.searchParams.set(key, String(value));
+    }
+    const response = await fetch(url.toString(), { headers: authHeaders() });
+    if (!response.ok) {
+      handleUnauthorized(response.status);
+      throw new Error(`Не удалось выгрузить CSV: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `product-${id}-companies.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  },
 
   graphCompany: (id: string | number) => get<GraphData>(`/graph/company/${id}`),
   graphOverview: (limit = 25) => get<GraphData>('/graph/overview', { limit }),

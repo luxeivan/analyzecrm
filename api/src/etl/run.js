@@ -5,6 +5,7 @@ import { fetchAll, fetchWindow, sleep } from '../bitrix.js';
 import { ensureSchema } from './schema.js';
 import { loadEntityFields, loadStatuses, saveFields, saveStatuses } from './fields.js';
 import { ENTITY_LIST, transformRow } from './transform.js';
+import { loadDealProductRows, refreshProductRows } from './productrows.js';
 import {
   getCursor,
   getModifiedCursor,
@@ -210,7 +211,12 @@ export async function runEtl({
   }
   onEvent({ type: 'schema-ready' });
 
-  const metaByEntity = await loadMetadata({ control, onEvent, entityList });
+  // Псевдо-сущности (состав сделок) не имеют crm.*.fields — грузятся своим загрузчиком
+  const metaByEntity = await loadMetadata({
+    control,
+    onEvent,
+    entityList: entityList.filter((entity) => !entity.custom),
+  });
   await sleep(config.entityPauseMs);
 
   let failed = 0;
@@ -218,12 +224,21 @@ export async function runEtl({
   for (const entity of entityList) {
     try {
       await checkControl(control);
-      await loadEntity(entity, metaByEntity.get(entity.key), {
-        full,
-        control,
-        onEvent,
-        limit: entityLimits[entity.key],
-      });
+      if (entity.custom) {
+        await loadDealProductRows({
+          full,
+          control,
+          onEvent,
+          limit: entityLimits[entity.key],
+        });
+      } else {
+        await loadEntity(entity, metaByEntity.get(entity.key), {
+          full,
+          control,
+          onEvent,
+          limit: entityLimits[entity.key],
+        });
+      }
     } catch (err) {
       if (err?.name === 'StopRequested') {
         await markSync(entity.key, 'stopped').catch(() => {});
@@ -241,6 +256,10 @@ export async function runEtl({
     for (const entity of entityList) {
       try {
         await checkControl(control);
+        if (entity.custom) {
+          await refreshProductRows({ control, onEvent, overlapMinutes: undefined });
+          continue;
+        }
         await loadModified(entity, metaByEntity.get(entity.key), {
           control,
           onEvent,

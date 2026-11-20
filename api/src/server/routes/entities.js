@@ -113,7 +113,7 @@ entitiesRouter.get('/companies/:id', async (req, res, next) => {
     const company = rows[0];
     if (!company) return res.status(404).json({ error: 'Компания не найдена' });
 
-    const [contacts, deals, dealTotals] = await Promise.all([
+    const [contacts, deals, dealTotals, products] = await Promise.all([
       query(
         `SELECT id, title, name, last_name, second_name, phones, emails, raw->>'POST' AS position,
                 source_id, date_create, date_modify
@@ -136,6 +136,23 @@ entitiesRouter.get('/companies/:id', async (req, res, next) => {
            FROM deals WHERE company_id = $1`,
         [id],
       ),
+      // что покупала компания: строки товаров по её сделкам
+      query(
+        `SELECT r.product_id AS id,
+                COALESCE(max(p.name), max(r.product_name)) AS name,
+                sum(r.quantity)::float8 AS qty,
+                sum(r.price * r.quantity)::float8 AS revenue,
+                count(DISTINCT r.deal_id)::int AS deals,
+                max(d.date_create) AS last_at
+           FROM deal_product_rows r
+           JOIN deals d ON d.id = r.deal_id
+           LEFT JOIN products p ON p.id = r.product_id
+          WHERE d.company_id = $1 AND r.product_id IS NOT NULL
+          GROUP BY r.product_id
+          ORDER BY revenue DESC NULLS LAST
+          LIMIT 100`,
+        [id],
+      ),
     ]);
 
     res.json({
@@ -155,6 +172,7 @@ entitiesRouter.get('/companies/:id', async (req, res, next) => {
         ...row,
         source: decodeStatus(meta, row.source_id),
       })),
+      products: products.rows,
       deals_total: dealTotals.rows[0] ?? { count: 0, won: 0, open: 0, sum: 0, open_sum: 0 },
       deals: deals.rows.map((row) => ({
         ...row,
@@ -444,11 +462,42 @@ entitiesRouter.get('/deals/:id', async (req, res, next) => {
     const deal = rows[0];
     if (!deal) return res.status(404).json({ error: 'Сделка не найдена' });
 
+    const [products, productsTotal, company, contact] = await Promise.all([
+      query(
+        `SELECT r.product_id AS id, r.product_name AS name, r.quantity::float8 AS quantity,
+                r.price::float8 AS price, (r.price * r.quantity)::float8 AS revenue,
+                r.discount_sum::float8 AS discount, r.measure_name, r.product_id IS NOT NULL AS in_catalog,
+                p.section_id, s.name AS section_name
+           FROM deal_product_rows r
+           LEFT JOIN products p ON p.id = r.product_id
+           LEFT JOIN product_sections s ON s.id = p.section_id
+          WHERE r.deal_id = $1
+          ORDER BY r.line_id`,
+        [id],
+      ),
+      query(
+        `SELECT count(*)::int AS lines,
+                COALESCE(sum(quantity), 0)::float8 AS qty,
+                COALESCE(sum(price * quantity), 0)::float8 AS sum,
+                COALESCE(sum(discount_sum), 0)::float8 AS discount
+           FROM deal_product_rows WHERE deal_id = $1`,
+        [id],
+      ),
+      deal.company_id
+        ? query('SELECT id, title, city FROM companies WHERE id = $1', [deal.company_id])
+        : { rows: [] },
+      deal.contact_id
+        ? query('SELECT id, title, phones, emails FROM contacts WHERE id = $1', [deal.contact_id])
+        : { rows: [] },
+    ]);
+
     res.json({
       id: deal.id,
       title: deal.title,
       company_id: deal.company_id,
+      company: company.rows[0] || null,
       contact_id: deal.contact_id,
+      contact: contact.rows[0] || null,
       stage_id: deal.stage_id,
       stage: decodeStatus(meta, deal.stage_id),
       category_id: deal.category_id,
@@ -456,6 +505,8 @@ entitiesRouter.get('/deals/:id', async (req, res, next) => {
       currency_id: deal.currency_id,
       date_create: deal.date_create,
       date_modify: deal.date_modify,
+      products: products.rows,
+      products_total: productsTotal.rows[0],
       fields: describeEntity(meta, 'deal', deal.raw),
       raw: deal.raw,
     });

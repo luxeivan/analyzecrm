@@ -6,6 +6,9 @@ const USERFIELD_ENTITY = {
   company: 'CRM_COMPANY',
   contact: 'CRM_CONTACT',
   deal: 'CRM_DEAL',
+  lead: 'CRM_LEAD',
+  product: 'CRM_PRODUCT',
+  product_section: 'CRM_PRODUCT_SECTION',
 };
 
 /** Рекурсивно собирает все скалярные значения (для поиска по любым полям). */
@@ -78,9 +81,10 @@ export async function loadEntityFields(entity, fieldsMethod) {
   }
 
   // crm.<entity>.fields отдаёт типы, но варианты справочника (LIST) надёжнее в userfield.list
-  try {
+  const ufEntity = USERFIELD_ENTITY[entity];
+  if (ufEntity) try {
     const ufRes = await call('crm.userfield.list', {
-      filter: { ENTITY_ID: USERFIELD_ENTITY[entity] },
+      filter: { ENTITY_ID: ufEntity },
     });
     for (const uf of ufRes.result || []) {
       const code = uf.FIELD_NAME;

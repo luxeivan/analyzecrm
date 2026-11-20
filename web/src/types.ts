@@ -78,6 +78,7 @@ export interface CompanyDetail {
   fields: ProfileField[];
   contacts: ContactRow[];
   deals: DealRow[];
+  products: CompanyProduct[];
   deals_total: { count: number; won: number; open: number; sum: number; open_sum: number };
   raw: Record<string, unknown>;
 }
@@ -164,6 +165,10 @@ export interface DealDetail {
   currency_id: string | null;
   date_create: string | null;
   date_modify: string | null;
+  company?: { id: number; title: string; city: string | null } | null;
+  contact?: { id: number; title: string; phones: MultiValue[]; emails: MultiValue[] } | null;
+  products: DealProductRow[];
+  products_total: { lines: number; qty: number; sum: number; discount: number };
   fields: ProfileField[];
   raw: Record<string, unknown>;
 }
@@ -587,4 +592,133 @@ export interface AuthUser {
   isSystem: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Товары и отчёты по продажам
+// ---------------------------------------------------------------------------
+export interface CompanyProduct {
+  id: number;
+  name: string | null;
+  qty: number;
+  revenue: number;
+  deals: number;
+  last_at: string | null;
+}
+
+export interface DealProductRow {
+  id: number | null;
+  name: string | null;
+  quantity: number;
+  price: number;
+  revenue: number;
+  discount: number;
+  measure_name: string | null;
+  in_catalog: boolean;
+  section_id: number | null;
+  section_name: string | null;
+}
+
+export interface ProductRow {
+  id: number;
+  name: string | null;
+  section_id: number | null;
+  price: number | null;
+  currency_id: string | null;
+  measure: string | null;
+  active: boolean;
+  qty: number;
+  revenue: number;
+  deals: number;
+  companies: number;
+}
+
+export interface ProductSection {
+  id: number;
+  name: string | null;
+  parent_id: number | null;
+  sort: number | null;
+  products: number;
+}
+
+export interface ProductTimelinePoint {
+  period: string;
+  revenue: number;
+  qty: number;
+  deals: number;
+}
+
+export interface ProductTopRow {
+  id: number;
+  name: string | null;
+  section_id: number | null;
+  qty: number;
+  revenue: number;
+  deals: number;
+  companies: number;
+}
+
+export interface ProductAnalytics {
+  period: { from: string | null; to: string | null; group: string };
+  stage: 'won' | 'all';
+  totals: { revenue: number; qty: number; deals: number; companies: number; products: number };
+  topProducts: ProductTopRow[];
+  topSections: { id: number; name: string | null; revenue: number; qty: number; deals: number }[];
+  timeline: ProductTimelinePoint[];
+}
+
+export interface ProductReportCompany {
+  id: number;
+  title: string | null;
+  city: string | null;
+  industry: string | null;
+  source: string | null;
+  industry_id: string | null;
+  source_id: string | null;
+  revenue: number;
+  qty: number;
+  deals: number;
+  won_deals: number;
+  contacts: number;
+  first_at: string | null;
+  last_at: string | null;
+}
+
+export interface ProductReportDeal {
+  deal_id: number;
+  deal_title: string | null;
+  stage_id: string | null;
+  stage: string | null;
+  company_id: number | null;
+  opportunity: number | null;
+  quantity: number;
+  revenue: number;
+  date_create: string | null;
+}
+
+export interface ProductReport {
+  product: {
+    id: number;
+    name: string | null;
+    section_id: number | null;
+    section_path: { id: number; name: string | null }[];
+    price: number | null;
+    currency_id: string | null;
+    measure: string | null;
+    active: boolean;
+  };
+  period: { from: string | null; to: string | null; group: string };
+  stage: 'won' | 'all';
+  totals: {
+    revenue: number;
+    qty: number;
+    discount: number;
+    deals: number;
+    companies: number;
+    first_at: string | null;
+    last_at: string | null;
+  };
+  timeline: (ProductTimelinePoint & { companies: number })[];
+  companies: ProductReportCompany[];
+  deals: ProductReportDeal[];
 }

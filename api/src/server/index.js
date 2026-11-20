@@ -5,6 +5,7 @@ import { pool } from '../db.js';
 import { ensureSchema } from '../etl/schema.js';
 import { metaRouter } from './routes/meta.js';
 import { entitiesRouter } from './routes/entities.js';
+import { productsRouter } from './routes/products.js';
 import { graphRouter } from './routes/graph.js';
 import { statsRouter } from './routes/stats.js';
 import { analyticsRouter } from './routes/analytics.js';
@@ -43,6 +44,7 @@ app.use('/api/embed', requireAdmin);
 
 app.use('/api', metaRouter);
 app.use('/api', entitiesRouter);
+app.use('/api', productsRouter);
 app.use('/api', graphRouter);
 app.use('/api', statsRouter);
 app.use('/api', analyticsRouter);
